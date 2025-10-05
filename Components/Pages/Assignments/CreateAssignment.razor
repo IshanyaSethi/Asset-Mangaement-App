@@ -1,0 +1,286 @@
+@page "/assignments/create"
+@using AssetManagementApp.Services
+@inject ToastService ToastService
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Assign Asset</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Assign Asset to Employee</h4>
+                </div>
+                <div class="card-body">
+                    
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <i class="bi bi-check-circle"></i> @successMessage
+                            <button type="button" class="btn-close" @onclick="@(() => successMessage = null)"></button>
+                        </div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border text-primary"></div>
+                            <p class="mt-2">Loading...</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <EditForm Model="assignment" OnValidSubmit="HandleSubmit" FormName="AssignmentForm">
+                            
+                            <!-- Select Employee -->
+                            <div class="mb-3">
+                                <label for="employee" class="form-label">
+                                    Select Employee <span class="text-danger">*</span>
+                                </label>
+                                <select id="employee" 
+                                        class="form-select" 
+                                        @bind="selectedEmployeeId"
+                                        required>
+                                    <option value="0">-- Select Employee --</option>
+                                    @foreach (var emp in activeEmployees)
+                                    {
+                                        <option value="@emp.EmployeeId">
+                                            @emp.FullName - @emp.Department (@emp.Designation)
+                                        </option>
+                                    }
+                                </select>
+                                @if (selectedEmployeeId == 0 && showValidation)
+                                {
+                                    <div class="text-danger">Please select an employee</div>
+                                }
+                            </div>
+
+                            <!-- Select Asset -->
+                            <div class="mb-3">
+                                <label for="asset" class="form-label">
+                                    Select Asset <span class="text-danger">*</span>
+                                </label>
+                                <select id="asset" 
+                                        class="form-select" 
+                                        @bind="selectedAssetId"
+                                        @bind:after="OnAssetSelected"
+                                        required>
+                                    <option value="0">-- Select Asset --</option>
+                                    @foreach (var asset in availableAssets)
+                                    {
+                                        <option value="@asset.AssetId">
+                                            @asset.AssetName - @asset.AssetType (@asset.SerialNumber)
+                                            @(asset.IsSpare ? " [SPARE]" : "")
+                                        </option>
+                                    }
+                                </select>
+                                @if (selectedAssetId == 0 && showValidation)
+                                {
+                                    <div class="text-danger">Please select an asset</div>
+                                }
+                            </div>
+
+                            <!-- Asset Preview -->
+                            @if (selectedAsset != null)
+                            {
+                                <div class="alert alert-info">
+                                    <h6>Selected Asset Details:</h6>
+                                    <ul class="mb-0">
+                                        <li><strong>Name:</strong> @selectedAsset.AssetName</li>
+                                        <li><strong>Type:</strong> @selectedAsset.AssetType</li>
+                                        <li><strong>Serial Number:</strong> @selectedAsset.SerialNumber</li>
+                                        <li><strong>Condition:</strong> 
+                                            <span class="badge bg-primary">@selectedAsset.Condition</span>
+                                        </li>
+                                        @if (!string.IsNullOrEmpty(selectedAsset.Specifications))
+                                        {
+                                            <li><strong>Specifications:</strong> @selectedAsset.Specifications</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+
+                            <!-- Assignment Date -->
+                            <div class="mb-3">
+                                <label for="assignedDate" class="form-label">
+                                    Assignment Date <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" 
+                                       id="assignedDate" 
+                                       class="form-control" 
+                                       @bind="assignmentDate"
+                                       max="@DateTime.Now.ToString("yyyy-MM-dd")"
+                                       required />
+                            </div>
+
+                            <!-- Notes -->
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">
+                                    Notes (Optional)
+                                </label>
+                                <textarea id="notes" 
+                                         class="form-control" 
+                                         @bind="notes" 
+                                         rows="3"
+                                         placeholder="Any additional notes about this assignment..."></textarea>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary" @onclick="Cancel">
+                                    <i class="bi bi-x-circle"></i> Cancel
+                                </button>
+                                <button type="submit" class="btn btn-success" disabled="@isAssigning">
+                                    @if (isAssigning)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="bi bi-check-circle"></i> Assign Asset
+                                </button>
+                            </div>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private IAssignmentService AssignmentService { get; set; } = default!;
+    [Inject] private IEmployeeService EmployeeService { get; set; } = default!;
+    [Inject] private IAssetService AssetService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private List<Employee> activeEmployees = new();
+    private List<Asset> availableAssets = new();
+    private Asset? selectedAsset;
+    
+    private int selectedEmployeeId = 0;
+    private int selectedAssetId = 0;
+    private DateTime assignmentDate = DateTime.Now;
+    private string? notes;
+    
+    private AssetAssignment assignment = new();
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading = false;
+    private bool isAssigning = false;
+    private bool showValidation = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        
+        try
+        {
+            // Load active employees
+            activeEmployees = await EmployeeService.GetActiveEmployeesAsync();
+            
+            // Load available assets
+            availableAssets = await AssetService.GetAvailableAssetsAsync();
+            
+            if (!activeEmployees.Any())
+            {
+                errorMessage = "No active employees found. Please add active employees first.";
+            }
+            
+            if (!availableAssets.Any())
+            {
+                errorMessage = "No available assets found. All assets are currently assigned or unavailable.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnAssetSelected()
+    {
+        if (selectedAssetId > 0)
+        {
+            selectedAsset = await AssetService.GetAssetByIdAsync(selectedAssetId);
+        }
+        else
+        {
+            selectedAsset = null;
+        }
+    }
+
+   private async Task HandleSubmit()
+{
+    showValidation = true;
+    
+    if (selectedEmployeeId == 0)
+    {
+        ToastService.ShowWarning("Please select an employee");
+        return;
+    }
+    
+    if (selectedAssetId == 0)
+    {
+        ToastService.ShowWarning("Please select an asset");
+        return;
+    }
+
+    isAssigning = true;
+    errorMessage = null;
+    successMessage = null;
+
+    try
+    {
+        var newAssignment = await AssignmentService.AssignAssetAsync(
+            selectedAssetId, 
+            selectedEmployeeId, 
+            notes
+        );
+
+        ToastService.ShowSuccess($"✓ Asset successfully assigned to {newAssignment.Employee.FullName}!");
+        
+        // Reset form
+        selectedEmployeeId = 0;
+        selectedAssetId = 0;
+        selectedAsset = null;
+        notes = null;
+        assignmentDate = DateTime.Now;
+        showValidation = false;
+        
+        availableAssets = await AssetService.GetAvailableAssetsAsync();
+    }
+    catch (AssetNotAvailableException ex)
+    {
+        ToastService.ShowError($"✗ {ex.Message}");
+    }
+    catch (EmployeeNotActiveException ex)
+    {
+        ToastService.ShowError($"✗ {ex.Message}");
+    }
+    catch (Exception ex)
+    {
+        ToastService.ShowError("Failed to assign asset");
+    }
+    finally
+    {
+        isAssigning = false;
+    }
+}
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/assignments");
+    }
+}

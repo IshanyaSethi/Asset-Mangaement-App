@@ -1,0 +1,115 @@
+@using AssetManagementApp.Services
+@implements IDisposable
+
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    @foreach (var toast in toasts)
+    {
+        <div class="toast show @GetToastClass(toast.Type)" role="alert">
+            <div class="toast-header @GetHeaderClass(toast.Type)">
+                <i class="bi @GetToastIcon(toast.Type) me-2"></i>
+                <strong class="me-auto">@GetToastTitle(toast.Type)</strong>
+                <button type="button" class="btn-close @GetCloseButtonClass(toast.Type)" @onclick="() => RemoveToast(toast)"></button>
+            </div>
+            <div class="toast-body">
+                @toast.Message
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .toast {
+        min-width: 300px;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        margin-bottom: 0.5rem;
+    }
+</style>
+
+@code {
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    
+    private List<ToastMessage> toasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += ShowToast;
+    }
+
+    private void ShowToast(string message, ToastType type)
+    {
+        var toast = new ToastMessage
+        {
+            Message = message,
+            Type = type,
+            Id = Guid.NewGuid()
+        };
+
+        toasts.Add(toast);
+        StateHasChanged();
+
+        Task.Delay(5000).ContinueWith(_ =>
+        {
+            RemoveToast(toast);
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void RemoveToast(ToastMessage toast)
+    {
+        toasts.Remove(toast);
+    }
+
+    private string GetToastClass(ToastType type) => type switch
+    {
+        ToastType.Success => "border-success",
+        ToastType.Error => "border-danger",
+        ToastType.Warning => "border-warning",
+        ToastType.Info => "border-info",
+        _ => "border-secondary"
+    };
+
+    private string GetHeaderClass(ToastType type) => type switch
+    {
+        ToastType.Success => "bg-success text-white",
+        ToastType.Error => "bg-danger text-white",
+        ToastType.Warning => "bg-warning text-dark",
+        ToastType.Info => "bg-info text-white",
+        _ => "bg-secondary text-white"
+    };
+
+    private string GetCloseButtonClass(ToastType type) => type switch
+    {
+        ToastType.Warning => "",
+        _ => "btn-close-white"
+    };
+
+    private string GetToastIcon(ToastType type) => type switch
+    {
+        ToastType.Success => "bi-check-circle-fill",
+        ToastType.Error => "bi-exclamation-triangle-fill",
+        ToastType.Warning => "bi-exclamation-circle-fill",
+        ToastType.Info => "bi-info-circle-fill",
+        _ => "bi-bell-fill"
+    };
+
+    private string GetToastTitle(ToastType type) => type switch
+    {
+        ToastType.Success => "Success",
+        ToastType.Error => "Error",
+        ToastType.Warning => "Warning",
+        ToastType.Info => "Information",
+        _ => "Notification"
+    };
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= ShowToast;
+    }
+
+    private class ToastMessage
+    {
+        public Guid Id { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public ToastType Type { get; set; }
+    }
+}

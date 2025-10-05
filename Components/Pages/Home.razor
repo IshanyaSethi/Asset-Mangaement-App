@@ -1,0 +1,196 @@
+﻿@page "/"
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>Asset Management Dashboard</h3>
+            <p class="text-muted">Overview of your asset inventory and assignments</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+            <p class="mt-2">Loading dashboard...</p>
+        </div>
+    }
+    else if (stats != null)
+    {
+        <!-- Asset Statistics Row -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <h5 class="mb-3">Asset Overview</h5>
+            </div>
+            
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Total Assets</h6>
+                                <h2 class="mt-2 mb-0">@stats.TotalAssets</h2>
+                            </div>
+                            <div>
+                                <i class="bi bi-box-seam" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Available</h6>
+                                <h2 class="mt-2 mb-0">@stats.AvailableAssets</h2>
+                            </div>
+                            <div>
+                                <i class="bi bi-check-circle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-info">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Assigned</h6>
+                                <h2 class="mt-2 mb-0">@stats.AssignedAssets</h2>
+                            </div>
+                            <div>
+                                <i class="bi bi-person-check" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0 text-dark">Under Repair</h6>
+                                <h2 class="mt-2 mb-0 text-dark">@stats.UnderRepairAssets</h2>
+                            </div>
+                            <div>
+                                <i class="bi bi-tools text-dark" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-secondary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Retired</h6>
+                                <h2 class="mt-2 mb-0">@stats.RetiredAssets</h2>
+                            </div>
+                            <div>
+                                <i class="bi bi-archive" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-dark">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Spare Assets</h6>
+                                <h2 class="mt-2 mb-0">@stats.SpareAssets</h2>
+                            </div>
+                            <div>
+                                <i class="bi bi-boxes" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-2">
+                                <a href="/employees/add" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-person-plus"></i>
+                                    <br />Add Employee
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <a href="/assets/add" class="btn btn-outline-success w-100">
+                                    <i class="bi bi-plus-square"></i>
+                                    <br />Add Asset
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <a href="/assignments/create" class="btn btn-outline-info w-100">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                    <br />Assign Asset
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <a href="/reports" class="btn btn-outline-warning w-100">
+                                    <i class="bi bi-clipboard-data"></i>
+                                    <br />View Reports
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> Error loading dashboard data
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] private IDashboardService DashboardService { get; set; } = default!;
+
+    private DashboardStats? stats;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            stats = await DashboardService.GetDashboardStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

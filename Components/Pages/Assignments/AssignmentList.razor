@@ -1,0 +1,320 @@
+@page "/assignments"
+@using AssetManagementApp.Services
+@inject ToastService ToastService
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Asset Assignments</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h3>Asset Assignments</h3>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-primary" @onclick="NavigateToCreate">
+                <i class="bi bi-plus-circle"></i> New Assignment
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(showActive ? "active" : "")" 
+                    @onclick="@(() => SetFilter(true))">
+                Active Assignments (@activeCount)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(!showActive ? "active" : "")" 
+                    @onclick="@(() => SetFilter(false))">
+                All History
+            </button>
+        </li>
+    </ul>
+
+    <!-- Success/Error Messages -->
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="bi bi-check-circle"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="@(() => successMessage = null)"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+        </div>
+    }
+
+    <!-- Assignments Table -->
+    @if (assignments == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary"></div>
+            <p class="mt-2">Loading assignments...</p>
+        </div>
+    }
+    else if (!assignments.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 
+            @if (showActive)
+            {
+                <span>No active assignments found.</span>
+            }
+            else
+            {
+                <span>No assignment history found.</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Asset</th>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Assigned Date</th>
+                        <th>Returned Date</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var assignment in assignments)
+                    {
+                        <tr>
+                            <td>@assignment.AssignmentId</td>
+                            <td>
+                                <strong>@assignment.Asset.AssetName</strong>
+                                <br />
+                                <small class="text-muted">@assignment.Asset.SerialNumber</small>
+                            </td>
+                            <td>
+                                <strong>@assignment.Employee.FullName</strong>
+                                <br />
+                                <small class="text-muted">@assignment.Employee.Email</small>
+                            </td>
+                            <td>@assignment.Employee.Department</td>
+                            <td>@assignment.AssignedDate.ToString("MMM dd, yyyy")</td>
+                            <td>
+                                @if (assignment.ReturnedDate.HasValue)
+                                {
+                                    @assignment.ReturnedDate.Value.ToString("MMM dd, yyyy")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                @{
+                                    var endDate = assignment.ReturnedDate ?? DateTime.Now;
+                                    var duration = (endDate - assignment.AssignedDate).Days;
+                                }
+                                @duration day@(duration != 1 ? "s" : "")
+                            </td>
+                            <td>
+                                @if (assignment.ReturnedDate.HasValue)
+                                {
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-check-circle"></i> Returned
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-person-check"></i> Active
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                @if (!assignment.ReturnedDate.HasValue)
+                                {
+                                    <button class="btn btn-sm btn-warning" 
+                                            @onclick="@(() => ShowReturnConfirmation(assignment))">
+                                        <i class="bi bi-arrow-return-left"></i> Return
+                                    </button>
+                                }
+                                @if (!string.IsNullOrEmpty(assignment.Notes))
+                                {
+                                    <button class="btn btn-sm btn-outline-info" 
+                                            @onclick="@(() => ShowNotes(assignment))">
+                                        <i class="bi bi-sticky"></i> Notes
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Return Confirmation Modal -->
+@if (showReturnModal && assignmentToReturn != null)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Return Asset</h5>
+                    <button type="button" class="btn-close" @onclick="CancelReturn"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Mark asset <strong>@assignmentToReturn.Asset.AssetName</strong> as returned from <strong>@assignmentToReturn.Employee.FullName</strong>?</p>
+                    <p><small class="text-muted">Serial: @assignmentToReturn.Asset.SerialNumber</small></p>
+                    <p><small class="text-muted">Assigned: @assignmentToReturn.AssignedDate.ToString("MMM dd, yyyy")</small></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelReturn">Cancel</button>
+                    <button class="btn btn-warning" @onclick="ConfirmReturn" disabled="@isReturning">
+                        @if (isReturning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Return Asset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Notes Modal -->
+@if (showNotesModal && assignmentWithNotes != null)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assignment Notes</h5>
+                    <button type="button" class="btn-close" @onclick="@(() => showNotesModal = false)"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Asset:</strong> @assignmentWithNotes.Asset.AssetName</p>
+                    <p><strong>Employee:</strong> @assignmentWithNotes.Employee.FullName</p>
+                    <hr />
+                    <p>@assignmentWithNotes.Notes</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="@(() => showNotesModal = false)">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private IAssignmentService AssignmentService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private List<AssetAssignment>? assignments;
+    private bool showActive = true;
+    private int activeCount = 0;
+    private string? successMessage;
+    private string? errorMessage;
+    
+    // Return modal
+    private bool showReturnModal = false;
+    private AssetAssignment? assignmentToReturn;
+    private bool isReturning = false;
+    
+    // Notes modal
+    private bool showNotesModal = false;
+    private AssetAssignment? assignmentWithNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAssignments();
+    }
+
+    private async Task LoadAssignments()
+    {
+        try
+        {
+            if (showActive)
+            {
+                assignments = await AssignmentService.GetActiveAssignmentsAsync();
+            }
+            else
+            {
+                assignments = await AssignmentService.GetAllAssignmentsAsync();
+            }
+            
+            // Get active count for tab
+            var activeAssignments = await AssignmentService.GetActiveAssignmentsAsync();
+            activeCount = activeAssignments.Count;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading assignments: {ex.Message}";
+        }
+    }
+
+    private async Task SetFilter(bool active)
+    {
+        showActive = active;
+        await LoadAssignments();
+    }
+
+    private void NavigateToCreate()
+    {
+        Navigation.NavigateTo("/assignments/create");
+    }
+
+    private void ShowReturnConfirmation(AssetAssignment assignment)
+    {
+        assignmentToReturn = assignment;
+        showReturnModal = true;
+    }
+
+    private void CancelReturn()
+    {
+        showReturnModal = false;
+        assignmentToReturn = null;
+    }
+
+    private async Task ConfirmReturn()
+{
+    if (assignmentToReturn == null) return;
+
+    isReturning = true;
+
+    try
+    {
+        await AssignmentService.ReturnAssetAsync(assignmentToReturn.AssignmentId);
+        
+        ToastService.ShowSuccess($"✓ Asset '{assignmentToReturn.Asset.AssetName}' returned successfully!");
+        showReturnModal = false;
+        assignmentToReturn = null;
+        
+        await LoadAssignments();
+    }
+    catch (Exception ex)
+    {
+        ToastService.ShowError("Failed to return asset");
+        showReturnModal = false;
+    }
+    finally
+    {
+        isReturning = false;
+    }
+}
+
+    private void ShowNotes(AssetAssignment assignment)
+    {
+        assignmentWithNotes = assignment;
+        showNotesModal = true;
+    }
+}

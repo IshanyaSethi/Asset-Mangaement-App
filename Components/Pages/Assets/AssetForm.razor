@@ -1,0 +1,329 @@
+@page "/assets/add"
+@page "/assets/edit/{Id:int}"
+@using AssetManagementApp.Services
+@inject ToastService ToastService
+@rendermode @(new InteractiveServerRenderMode())
+
+
+<PageTitle>@(Id == 0 ? "Add" : "Edit") Asset</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-header">
+                    <h4>@(Id == 0 ? "Add New Asset" : "Edit Asset")</h4>
+                </div>
+                <div class="card-body">
+                    
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+                        </div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading asset data...</p>
+                        </div>
+                    }
+                    else if (asset != null)
+                    {
+                        <EditForm Model="asset" OnValidSubmit="HandleSubmit" FormName="AssetForm">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="row">
+                                <!-- Left Column -->
+                                <div class="col-md-6">
+                                    
+                                    <!-- Asset Name -->
+                                    <div class="mb-3">
+                                        <label for="assetName" class="form-label">
+                                            Asset Name <span class="text-danger">*</span>
+                                        </label>
+                                        <InputText id="assetName" 
+                                                  class="form-control" 
+                                                  @bind-Value="asset.AssetName" 
+                                                  placeholder="e.g., Dell Laptop XPS 15" />
+                                        <ValidationMessage For="@(() => asset.AssetName)" class="text-danger" />
+                                    </div>
+
+                                    <!-- Asset Type -->
+                                    <div class="mb-3">
+                                        <label for="assetType" class="form-label">
+                                            Asset Type <span class="text-danger">*</span>
+                                        </label>
+                                        <InputText id="assetType" 
+                                                  class="form-control" 
+                                                  @bind-Value="asset.AssetType" 
+                                                  placeholder="e.g., Laptop, Monitor, Keyboard" 
+                                                  list="assetTypeList" />
+                                        <datalist id="assetTypeList">
+    <option value="Laptop"></option>
+    <option value="Monitor"></option>
+    <option value="Keyboard"></option>
+    <option value="Mouse"></option>
+    <option value="Mobile Phone"></option>
+    <option value="Tablet"></option>
+    <option value="Headset"></option>
+    <option value="Printer"></option>
+    <option value="Scanner"></option>
+    <option value="Webcam"></option>
+</datalist>
+                                        <ValidationMessage For="@(() => asset.AssetType)" class="text-danger" />
+                                    </div>
+
+                                    <!-- Make/Model -->
+                                    <div class="mb-3">
+                                        <label for="makeModel" class="form-label">
+                                            Make/Model
+                                        </label>
+                                        <InputText id="makeModel" 
+                                                  class="form-control" 
+                                                  @bind-Value="asset.MakeModel" 
+                                                  placeholder="e.g., Dell XPS 15 9520" />
+                                        <ValidationMessage For="@(() => asset.MakeModel)" class="text-danger" />
+                                    </div>
+
+                                    <!-- Serial Number -->
+                                    <div class="mb-3">
+                                        <label for="serialNumber" class="form-label">
+                                            Serial Number <span class="text-danger">*</span>
+                                        </label>
+                                        <InputText id="serialNumber" 
+                                                  class="form-control" 
+                                                  @bind-Value="asset.SerialNumber" 
+                                                  placeholder="e.g., DL-XPS-001" />
+                                        <div class="form-text">Must be unique</div>
+                                        <ValidationMessage For="@(() => asset.SerialNumber)" class="text-danger" />
+                                    </div>
+
+                                    <!-- Purchase Date -->
+                                    <div class="mb-3">
+                                        <label for="purchaseDate" class="form-label">
+                                            Purchase Date <span class="text-danger">*</span>
+                                        </label>
+                                        <InputDate id="purchaseDate" 
+                                                  class="form-control" 
+                                                  @bind-Value="asset.PurchaseDate" />
+                                        <ValidationMessage For="@(() => asset.PurchaseDate)" class="text-danger" />
+                                    </div>
+
+                                    <!-- Warranty Expiry Date -->
+                                    <div class="mb-3">
+                                        <label for="warrantyExpiry" class="form-label">
+                                            Warranty Expiry Date
+                                        </label>
+                                        <InputDate id="warrantyExpiry" 
+                                                  class="form-control" 
+                                                  @bind-Value="asset.WarrantyExpiryDate" />
+                                        <div class="form-text">Must be after purchase date</div>
+                                        <ValidationMessage For="@(() => asset.WarrantyExpiryDate)" class="text-danger" />
+                                    </div>
+
+                                </div>
+
+                                <!-- Right Column -->
+                                <div class="col-md-6">
+                                    
+                                    <!-- Condition -->
+                                    <div class="mb-3">
+                                        <label for="condition" class="form-label">
+                                            Condition <span class="text-danger">*</span>
+                                        </label>
+                                        <InputSelect id="condition" 
+                                                    class="form-select" 
+                                                    @bind-Value="asset.Condition">
+                                            <option value="">-- Select Condition --</option>
+                                            <option value="New">New</option>
+                                            <option value="Good">Good</option>
+                                            <option value="Needs Repair">Needs Repair</option>
+                                            <option value="Damaged">Damaged</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => asset.Condition)" class="text-danger" />
+                                    </div>
+
+                                    <!-- Status (only for edit mode) -->
+                                    @if (Id > 0)
+                                    {
+                                        <div class="mb-3">
+                                            <label for="status" class="form-label">
+                                                Status
+                                            </label>
+                                            <InputSelect id="status" 
+                                                        class="form-select" 
+                                                        @bind-Value="asset.Status">
+                                                <option value="Available">Available</option>
+                                                <option value="Under Repair">Under Repair</option>
+                                                <option value="Retired">Retired</option>
+                                            </InputSelect>
+                                            <div class="form-text">
+                                                Note: Cannot set to "Assigned" manually. Use assignment process.
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mb-3">
+                                            <div class="alert alert-info">
+                                                <i class="bi bi-info-circle"></i> New assets are automatically set to "Available" status.
+                                            </div>
+                                        </div>
+                                    }
+
+                                    <!-- Is Spare -->
+                                    <div class="mb-3 form-check">
+                                        <InputCheckbox id="isSpare" 
+                                                      class="form-check-input" 
+                                                      @bind-Value="asset.IsSpare" />
+                                        <label class="form-check-label" for="isSpare">
+                                            <strong>Mark as Spare Asset</strong>
+                                        </label>
+                                        <div class="form-text">
+                                            Check if this is a backup/spare item
+                                        </div>
+                                    </div>
+
+                                    <!-- Specifications -->
+                                    <div class="mb-3">
+                                        <label for="specifications" class="form-label">
+                                            Specifications / Details
+                                        </label>
+                                        <InputTextArea id="specifications" 
+                                                      class="form-control" 
+                                                      @bind-Value="asset.Specifications" 
+                                                      rows="6"
+                                                      placeholder="e.g., Intel i7, 16GB RAM, 512GB SSD, Windows 11 Pro" />
+                                        <ValidationMessage For="@(() => asset.Specifications)" class="text-danger" />
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                                <button type="button" class="btn btn-secondary" @onclick="Cancel">
+                                    <i class="bi bi-x-circle"></i> Cancel
+                                </button>
+                                <button type="submit" class="btn btn-success" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="bi bi-save"></i> Save Asset
+                                </button>
+                            </div>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private IAssetService AssetService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private Asset? asset;
+    private string? errorMessage;
+    private bool isLoading = false;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            if (Id > 0)
+            {
+                // Edit mode - load existing asset
+                asset = await AssetService.GetAssetByIdAsync(Id);
+                
+                if (asset == null)
+                {
+                    errorMessage = "Asset not found.";
+                    asset = new Asset(); // Prevent null reference
+                }
+            }
+            else
+            {
+                // Add mode - create new asset
+                asset = new Asset
+                {
+                    PurchaseDate = DateTime.Now,
+                    Condition = "Good",
+                    Status = "Available",
+                    IsSpare = false
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading asset: {ex.Message}";
+            asset = new Asset();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+{
+    if (asset == null) return;
+
+    // Custom validation: Warranty must be after purchase
+    if (asset.WarrantyExpiryDate.HasValue && asset.WarrantyExpiryDate < asset.PurchaseDate)
+    {
+        ToastService.ShowError("Warranty expiry date must be after purchase date");
+        return;
+    }
+
+    isSaving = true;
+
+    try
+    {
+        if (Id == 0)
+        {
+            await AssetService.AddAssetAsync(asset);
+            ToastService.ShowSuccess($"✓ Asset '{asset.AssetName}' added successfully!");
+        }
+        else
+        {
+            asset.AssetId = Id;
+            await AssetService.UpdateAssetAsync(asset);
+            ToastService.ShowSuccess($"✓ Asset '{asset.AssetName}' updated successfully!");
+        }
+
+        Navigation.NavigateTo("/assets");
+    }
+    catch (InvalidOperationException ex)
+    {
+        ToastService.ShowError(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        ToastService.ShowError("Failed to save asset");
+    }
+    finally
+    {
+        isSaving = false;
+    }
+}
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/assets");
+    }
+}

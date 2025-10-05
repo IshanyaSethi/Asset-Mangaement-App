@@ -1,0 +1,228 @@
+@page "/employees"
+@using AssetManagementApp.Services
+@inject ToastService ToastService
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Employee Management</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h3>Employee Management</h3>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-primary" @onclick="NavigateToAdd">
+                Add New Employee
+            </button>
+        </div>
+    </div>
+
+    <!-- Search Box -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" 
+                       class="form-control" 
+                       placeholder="Search..." 
+                       @bind="searchTerm"
+                       @bind:event="oninput"
+                       @onkeyup="HandleSearch" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="@(() => successMessage = null)"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+        </div>
+    }
+
+    <!-- Loading State -->
+    @if (employees == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary"></div>
+            <p>Loading employees...</p>
+        </div>
+    }
+    else if (!employees.Any())
+    {
+        <div class="alert alert-info">No employees found.</div>
+    }
+    else
+    {
+        <!-- Employee Table -->
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Full Name</th>
+                        <th>Department</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var employee in employees)
+                    {
+                        <tr>
+                            <td>@employee.EmployeeId</td>
+                            <td><strong>@employee.FullName</strong></td>
+                            <td>@employee.Department</td>
+                            <td>@employee.Email</td>
+                            <td>
+                                @if (employee.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary me-1" 
+                                        @onclick="@(() => NavigateToEdit(employee.EmployeeId))">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-danger" 
+                                        @onclick="@(() => ShowDeleteConfirmation(employee))">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Delete Modal -->
+@if (showDeleteModal && employeeToDelete != null)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,0.5);" @onclick:stopPropagation="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Delete employee <strong>@employeeToDelete.FullName</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private IEmployeeService EmployeeService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private List<Employee>? employees;
+    private string? searchTerm;
+    private string? successMessage;
+    private string? errorMessage;
+    private bool showDeleteModal = false;
+    private Employee? employeeToDelete;
+    private bool isDeleting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+    }
+
+    private async Task LoadEmployees()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                employees = await EmployeeService.GetAllEmployeesAsync();
+            }
+            else
+            {
+                employees = await EmployeeService.SearchEmployeesAsync(searchTerm);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task HandleSearch()
+    {
+        await LoadEmployees();
+    }
+
+    private void NavigateToAdd()
+    {
+        Navigation.NavigateTo("/employees/add");
+    }
+
+    private void NavigateToEdit(int employeeId)
+    {
+        Navigation.NavigateTo($"/employees/edit/{employeeId}");
+    }
+
+    private void ShowDeleteConfirmation(Employee employee)
+    {
+        employeeToDelete = employee;
+        showDeleteModal = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteModal = false;
+        employeeToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+{
+    if (employeeToDelete == null) return;
+
+    isDeleting = true;
+
+    try
+    {
+        await EmployeeService.DeleteEmployeeAsync(employeeToDelete.EmployeeId);
+        ToastService.ShowSuccess($"✓ Employee '{employeeToDelete.FullName}' deleted successfully!");
+        showDeleteModal = false;
+        employeeToDelete = null;
+        await LoadEmployees();
+    }
+    catch (CannotDeleteException ex)
+    {
+        ToastService.ShowError($"✗ {ex.Message}");
+        showDeleteModal = false;
+    }
+    catch (Exception ex)
+    {
+        ToastService.ShowError("Failed to delete employee");
+        showDeleteModal = false;
+    }
+    finally
+    {
+        isDeleting = false;
+    }
+}
+}
